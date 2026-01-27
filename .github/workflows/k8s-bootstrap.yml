@@ -15,7 +15,7 @@ on:
 
 jobs:
   install-k8s:
-    runs-on: self-hosted
+    runs-on: [self-hosted, windows]
 
     steps:
       - name: Checkout repository
