@@ -21,37 +21,61 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 🔧 FIX 1: Export inventory variables to GITHUB_ENV
       - name: Load inventory
+        shell: bash
         run: |
           set -a
           source inventory/hosts.env
           set +a
 
+          echo "MASTER_IP=$MASTER_IP" >> $GITHUB_ENV
+          echo "WORKER_0_IP=$WORKER_0_IP" >> $GITHUB_ENV
+          echo "WORKER_1_IP=$WORKER_1_IP" >> $GITHUB_ENV
+          echo "SSH_USER=$SSH_USER" >> $GITHUB_ENV
+
+      # 🔧 FIX 2: Use CI-safe SSH options
       - name: Install Kubernetes prerequisites (ALL nodes)
         if: ${{ github.event.inputs.action == 'bootstrap-cluster' }}
+        shell: bash
         run: |
           for node in $MASTER_IP $WORKER_0_IP $WORKER_1_IP; do
             echo "Installing prerequisites on $node"
-            ssh $SSH_USER@$node 'sudo bash -s' < scripts/common.sh
+            ssh -o StrictHostKeyChecking=no \
+                -o UserKnownHostsFile=/dev/null \
+                $SSH_USER@$node \
+                'sudo bash -s' < scripts/common.sh
           done
 
       - name: Bootstrap Kubernetes Master
         if: ${{ github.event.inputs.action == 'bootstrap-cluster' }}
+        shell: bash
         run: |
-          ssh $SSH_USER@$MASTER_IP 'sudo bash -s' < scripts/master.sh
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              $SSH_USER@$MASTER_IP \
+              'sudo bash -s' < scripts/master.sh
 
       - name: Join Worker Nodes
         if: |
           github.event.inputs.action == 'bootstrap-cluster' ||
           github.event.inputs.action == 'join-workers'
+        shell: bash
         run: |
-          ssh $SSH_USER@$WORKER_0_IP 'sudo bash -s' < scripts/worker.sh
-          ssh $SSH_USER@$WORKER_1_IP 'sudo bash -s' < scripts/worker.sh
+          for node in $WORKER_0_IP $WORKER_1_IP; do
+            ssh -o StrictHostKeyChecking=no \
+                -o UserKnownHostsFile=/dev/null \
+                $SSH_USER@$node \
+                'sudo bash -s' < scripts/worker.sh
+          done
 
       - name: Deploy Observability Stack
         if: ${{ github.event.inputs.action == 'deploy-observability' }}
+        shell: bash
         run: |
-          ssh $SSH_USER@$MASTER_IP <<EOF
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              $SSH_USER@$MASTER_IP <<EOF
           kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
           kubectl apply -f manifests/monitoring/
           EOF
