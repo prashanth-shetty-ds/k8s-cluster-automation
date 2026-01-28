@@ -4,138 +4,52 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "Select the operation to perform"
+        description: "Operation"
         required: true
         default: "bootstrap-cluster"
         type: choice
         options:
           - bootstrap-cluster
           - join-workers
-          - deploy-observability
 
 jobs:
-  install-k8s:
+  bootstrap:
     runs-on: [self-hosted, linux]
 
     steps:
-      # ---------------------------------------------------
-      # Checkout
-      # ---------------------------------------------------
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # ---------------------------------------------------
-      # DEBUG: show selected action (CRITICAL)
-      # ---------------------------------------------------
-      - name: Debug selected action
+      - name: Identify node role
         shell: bash
         run: |
-          echo "======================================"
-          echo "Selected workflow action:"
-          echo "${{ github.event.inputs.action }}"
-          echo "======================================"
+          HOST=$(hostname)
+          if [[ "$HOST" == "master-0" ]]; then
+            echo "NODE_ROLE=MASTER" >> $GITHUB_ENV
+          elif [[ "$HOST" == worker-* ]]; then
+            echo "NODE_ROLE=WORKER" >> $GITHUB_ENV
+          else
+            echo "Unknown node role"; exit 1
+          fi
+          echo "Running on $HOST"
 
-      # ---------------------------------------------------
-      # Load inventory and export env vars
-      # ---------------------------------------------------
-      - name: Load inventory
-        shell: bash
-        run: |
-          set -a
-          source inventory/hosts.env
-          set +a
-
-          echo "MASTER_IP=$MASTER_IP" >> $GITHUB_ENV
-          echo "WORKER_0_IP=$WORKER_0_IP" >> $GITHUB_ENV
-          echo "WORKER_1_IP=$WORKER_1_IP" >> $GITHUB_ENV
-          echo "SSH_USER=$SSH_USER" >> $GITHUB_ENV
-
-      # ---------------------------------------------------
-      # Install prerequisites on ALL nodes
-      # ---------------------------------------------------
-      - name: Install Kubernetes prerequisites (ALL nodes)
+      - name: Install Kubernetes prerequisites
         if: ${{ github.event.inputs.action == 'bootstrap-cluster' }}
         shell: bash
         run: |
-          echo "=== Installing prerequisites on all nodes ==="
-          for node in $MASTER_IP $WORKER_0_IP $WORKER_1_IP; do
-            echo "--- Node: $node ---"
-            ssh -tt \
-              -o BatchMode=yes \
-              -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              $SSH_USER@$node \
-              'sudo -n -i bash -s' < scripts/common.sh
-          done
-          echo "=== Prerequisites installation completed ==="
+          sudo bash scripts/common.sh
 
-      # ---------------------------------------------------
-      # Bootstrap MASTER (kubeadm init)
-      # ---------------------------------------------------
       - name: Bootstrap Kubernetes Master
-        if: ${{ github.event.inputs.action == 'bootstrap-cluster' }}
-        shell: bash
-        run: |
-          echo "=== BOOTSTRAPPING MASTER NODE ==="
-          ssh -tt \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            $SSH_USER@$MASTER_IP \
-            'echo "[REMOTE] Running master.sh"; sudo -n -i bash -s' < scripts/master.sh
-          echo "=== MASTER BOOTSTRAP STEP COMPLETED ==="
-
-      # ---------------------------------------------------
-      # HARD VALIDATION: kubeadm init MUST exist
-      # ---------------------------------------------------
-      - name: Validate Kubernetes Control Plane
-        if: ${{ github.event.inputs.action == 'bootstrap-cluster' }}
-        shell: bash
-        run: |
-          echo "=== VALIDATING CONTROL PLANE ==="
-          ssh -tt \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            $SSH_USER@$MASTER_IP \
-            'test -f /etc/kubernetes/admin.conf'
-          echo "=== kubeadm init VERIFIED ==="
-
-      # ---------------------------------------------------
-      # Join worker nodes
-      # ---------------------------------------------------
-      - name: Join Worker Nodes
         if: |
-          github.event.inputs.action == 'bootstrap-cluster' ||
-          github.event.inputs.action == 'join-workers'
+          github.event.inputs.action == 'bootstrap-cluster' &&
+          env.NODE_ROLE == 'MASTER'
         shell: bash
         run: |
-          echo "=== JOINING WORKER NODES ==="
-          for node in $WORKER_0_IP $WORKER_1_IP; do
-            echo "--- Joining worker $node ---"
-            ssh -tt \
-              -o BatchMode=yes \
-              -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              $SSH_USER@$node \
-              'sudo -n -i bash -s' < scripts/worker.sh
-          done
-          echo "=== ALL WORKERS JOINED ==="
+          sudo bash scripts/master.sh
 
-      # ---------------------------------------------------
-      # Deploy observability (optional)
-      # ---------------------------------------------------
-      - name: Deploy Observability Stack
-        if: ${{ github.event.inputs.action == 'deploy-observability' }}
+      - name: Join Worker to Cluster
+        if: |
+          github.event.inputs.action == 'bootstrap-cluster' &&
+          env.NODE_ROLE == 'WORKER'
         shell: bash
         run: |
-          echo "=== DEPLOYING OBSERVABILITY STACK ==="
-          ssh -tt \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            $SSH_USER@$MASTER_IP <<EOF
-          kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
-          kubectl apply -f manifests/monitoring/
-          EOF
-          echo "=== OBSERVABILITY DEPLOYED ==="
+          sudo bash scripts/worker.sh
