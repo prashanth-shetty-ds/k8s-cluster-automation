@@ -46,7 +46,7 @@ jobs:
                 -o StrictHostKeyChecking=no \
                 -o UserKnownHostsFile=/dev/null \
                 $SSH_USER@$node \
-                'sudo -n bash -s' < scripts/common.sh
+                'sudo -n -i bash -s' < scripts/common.sh
           done
 
       - name: Bootstrap Kubernetes Master
@@ -58,7 +58,7 @@ jobs:
               -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               $SSH_USER@$MASTER_IP \
-              'sudo -n bash -s' < scripts/master.sh
+              'sudo -n -i bash -s' < scripts/master.sh
 
       - name: Join Worker Nodes
         if: |
@@ -72,7 +72,7 @@ jobs:
                 -o StrictHostKeyChecking=no \
                 -o UserKnownHostsFile=/dev/null \
                 $SSH_USER@$node \
-                'sudo -n bash -s' < scripts/worker.sh
+                'sudo -n -i bash -s' < scripts/worker.sh
           done
 
       - name: Deploy Observability Stack
