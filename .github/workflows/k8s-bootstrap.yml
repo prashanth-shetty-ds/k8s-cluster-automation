@@ -15,13 +15,29 @@ on:
 
 jobs:
   install-k8s:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, linux]
 
     steps:
+      # ---------------------------------------------------
+      # Checkout
+      # ---------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 🔧 FIX 1: Export inventory variables to GITHUB_ENV
+      # ---------------------------------------------------
+      # DEBUG: show selected action (CRITICAL)
+      # ---------------------------------------------------
+      - name: Debug selected action
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "Selected workflow action:"
+          echo "${{ github.event.inputs.action }}"
+          echo "======================================"
+
+      # ---------------------------------------------------
+      # Load inventory and export env vars
+      # ---------------------------------------------------
       - name: Load inventory
         shell: bash
         run: |
@@ -34,84 +50,92 @@ jobs:
           echo "WORKER_1_IP=$WORKER_1_IP" >> $GITHUB_ENV
           echo "SSH_USER=$SSH_USER" >> $GITHUB_ENV
 
-      # 🔧 FIX 2: CI-safe SSH + sudo (TTY + non-interactive)
+      # ---------------------------------------------------
+      # Install prerequisites on ALL nodes
+      # ---------------------------------------------------
       - name: Install Kubernetes prerequisites (ALL nodes)
         if: ${{ github.event.inputs.action == 'bootstrap-cluster' }}
         shell: bash
         run: |
+          echo "=== Installing prerequisites on all nodes ==="
           for node in $MASTER_IP $WORKER_0_IP $WORKER_1_IP; do
-            echo "Installing prerequisites on $node"
+            echo "--- Node: $node ---"
             ssh -tt \
-                -o BatchMode=yes \
-                -o StrictHostKeyChecking=no \
-                -o UserKnownHostsFile=/dev/null \
-                $SSH_USER@$node \
-                'sudo -n -i bash -s' < scripts/common.sh
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              $SSH_USER@$node \
+              'sudo -n -i bash -s' < scripts/common.sh
           done
+          echo "=== Prerequisites installation completed ==="
 
+      # ---------------------------------------------------
+      # Bootstrap MASTER (kubeadm init)
+      # ---------------------------------------------------
       - name: Bootstrap Kubernetes Master
         if: ${{ github.event.inputs.action == 'bootstrap-cluster' }}
         shell: bash
         run: |
-          echo "=== ENTERING MASTER BOOTSTRAP STEP ==="
+          echo "=== BOOTSTRAPPING MASTER NODE ==="
           ssh -tt \
-          -o BatchMode=yes \
-          -o StrictHostKeyChecking=no \
-          -o UserKnownHostsFile=/dev/null \
-          $SSH_USER@$MASTER_IP \
-          'echo "[REMOTE] Connected to master"; sudo -n -i bash -s' < scripts/master.sh
-          echo "=== EXITED MASTER BOOTSTRAP STEP ==="
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            $SSH_USER@$MASTER_IP \
+            'echo "[REMOTE] Running master.sh"; sudo -n -i bash -s' < scripts/master.sh
+          echo "=== MASTER BOOTSTRAP STEP COMPLETED ==="
 
-      - name: Validate kubeadm init
-        if: ${{ github.event.inputs.action == 'bootstrap-cluster' }}
-        run: |
-          ssh -tt \
-          -o BatchMode=yes \
-          -o StrictHostKeyChecking=no \
-          -o UserKnownHostsFile=/dev/null \
-          $SSH_USER@$MASTER_IP \
-          'test -f /etc/kubernetes/admin.conf'
-           echo "[SUCCESS] kubeadm init confirmed"
- 
+      # ---------------------------------------------------
+      # HARD VALIDATION: kubeadm init MUST exist
+      # ---------------------------------------------------
       - name: Validate Kubernetes Control Plane
         if: ${{ github.event.inputs.action == 'bootstrap-cluster' }}
         shell: bash
         run: |
+          echo "=== VALIDATING CONTROL PLANE ==="
           ssh -tt \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            $SSH_USER@$MASTER_IP \
+            'test -f /etc/kubernetes/admin.conf'
+          echo "=== kubeadm init VERIFIED ==="
+
+      # ---------------------------------------------------
+      # Join worker nodes
+      # ---------------------------------------------------
+      - name: Join Worker Nodes
+        if: |
+          github.event.inputs.action == 'bootstrap-cluster' ||
+          github.event.inputs.action == 'join-workers'
+        shell: bash
+        run: |
+          echo "=== JOINING WORKER NODES ==="
+          for node in $WORKER_0_IP $WORKER_1_IP; do
+            echo "--- Joining worker $node ---"
+            ssh -tt \
               -o BatchMode=yes \
               -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              $SSH_USER@$MASTER_IP \
-              'test -f /etc/kubernetes/admin.conf'
-
-          echo "[SUCCESS] kubeadm init verified"
-
-
-      - name: Join Worker Nodes
-        if: |
-          github.event.inputs.action == 'bootstrap-cluster'
-        shell: bash
-        run: |
-          echo "[INFO] Joining workers only after master validation"
-          for node in $WORKER_0_IP $WORKER_1_IP; do
-            ssh -tt \
-                -o BatchMode=yes \
-                -o StrictHostKeyChecking=no \
-                -o UserKnownHostsFile=/dev/null \
-                $SSH_USER@$node \
-                'sudo -n -i bash -s' < scripts/worker.sh
+              $SSH_USER@$node \
+              'sudo -n -i bash -s' < scripts/worker.sh
           done
+          echo "=== ALL WORKERS JOINED ==="
 
-
+      # ---------------------------------------------------
+      # Deploy observability (optional)
+      # ---------------------------------------------------
       - name: Deploy Observability Stack
         if: ${{ github.event.inputs.action == 'deploy-observability' }}
         shell: bash
         run: |
+          echo "=== DEPLOYING OBSERVABILITY STACK ==="
           ssh -tt \
-              -o BatchMode=yes \
-              -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              $SSH_USER@$MASTER_IP <<EOF
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            $SSH_USER@$MASTER_IP <<EOF
           kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
           kubectl apply -f manifests/monitoring/
           EOF
+          echo "=== OBSERVABILITY DEPLOYED ==="
