@@ -1,9 +1,11 @@
 #!/bin/bash
 set -e
 
+# Disable swap (required for Kubernetes)
 swapoff -a
 sed -i '/ swap / s/^/#/' /etc/fstab
 
+# Kernel modules
 modprobe overlay
 modprobe br_netfilter
 
@@ -15,20 +17,31 @@ EOF
 
 sysctl --system
 
+# Base packages
 apt-get update
-apt-get install -y containerd apt-transport-https curl gpg
+apt-get install -y \
+  containerd \
+  apt-transport-https \
+  curl \
+  gpg
 
+# containerd config
 containerd config default > /etc/containerd/config.toml
 systemctl restart containerd
 systemctl enable containerd
 
-# 🔐 Kubernetes repo (CI-safe)
-curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-  | gpg --dearmor -o /usr/share/keyrings/kubernetes-archive-keyring.gpg
+# 🔐 Kubernetes official repo (NEW – community-owned)
+mkdir -p /etc/apt/keyrings
 
-echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" \
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key \
+  | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /" \
   > /etc/apt/sources.list.d/kubernetes.list
 
+# Install Kubernetes components
 apt-get update
 apt-get install -y kubelet kubeadm kubectl
+
+# Prevent accidental upgrades
 apt-mark hold kubelet kubeadm kubectl
