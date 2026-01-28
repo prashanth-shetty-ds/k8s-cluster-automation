@@ -59,13 +59,27 @@ jobs:
               -o UserKnownHostsFile=/dev/null \
               $SSH_USER@$MASTER_IP \
               'sudo -n -i bash -s' < scripts/master.sh
+ 
+      - name: Validate Kubernetes Control Plane
+        if: ${{ github.event.inputs.action == 'bootstrap-cluster' }}
+        shell: bash
+        run: |
+          ssh -tt \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              $SSH_USER@$MASTER_IP \
+              'test -f /etc/kubernetes/admin.conf'
+
+          echo "[SUCCESS] kubeadm init verified"
+
 
       - name: Join Worker Nodes
         if: |
-          github.event.inputs.action == 'bootstrap-cluster' ||
-          github.event.inputs.action == 'join-workers'
+          github.event.inputs.action == 'bootstrap-cluster'
         shell: bash
         run: |
+          echo "[INFO] Joining workers only after master validation"
           for node in $WORKER_0_IP $WORKER_1_IP; do
             ssh -tt \
                 -o BatchMode=yes \
@@ -74,6 +88,7 @@ jobs:
                 $SSH_USER@$node \
                 'sudo -n -i bash -s' < scripts/worker.sh
           done
+
 
       - name: Deploy Observability Stack
         if: ${{ github.event.inputs.action == 'deploy-observability' }}
