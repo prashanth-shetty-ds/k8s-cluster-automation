@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euxo pipefail
 
 # Disable swap (required for Kubernetes)
 swapoff -a
@@ -16,6 +16,14 @@ net.bridge.bridge-nf-call-ip6tables=1
 EOF
 
 sysctl --system
+
+# Wait for apt locks
+
+while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
+      fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || \
+      fuser /var/cache/apt/archives/lock >/dev/null 2>&1; do
+  sleep 5
+done
 
 # Base packages
 apt-get update
