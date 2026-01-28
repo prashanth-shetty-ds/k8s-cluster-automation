@@ -2,6 +2,11 @@
 set -euxo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
+if [[ -z "${MASTER_IP:-}" ]]; then
+  echo "[ERROR] MASTER_IP is not set"
+  exit 1
+fi
+
 echo "[INFO] Worker bootstrap started"
 
 if [ -f /etc/kubernetes/kubelet.conf ]; then
@@ -9,7 +14,6 @@ if [ -f /etc/kubernetes/kubelet.conf ]; then
   exit 0
 fi
 
-# Fetch join command from master
 JOIN_CMD=$(ssh -o BatchMode=yes \
   -o StrictHostKeyChecking=no \
   -o UserKnownHostsFile=/dev/null \
