@@ -1,15 +1,35 @@
 #!/bin/bash
 set -e
 
+POD_CIDR="10.244.0.0/16"
+CRI_SOCKET="unix:///run/containerd/containerd.sock"
+
+# Prevent re-initialization (idempotency)
+if [ -f /etc/kubernetes/admin.conf ]; then
+  echo "[INFO] Kubernetes master already initialized. Skipping kubeadm init."
+  exit 0
+fi
+
+echo "[INFO] Initializing Kubernetes control plane..."
+
 kubeadm init \
-  --apiserver-advertise-address=192.168.29.150 \
-  --pod-network-cidr=10.244.0.0/16
+  --pod-network-cidr=${POD_CIDR} \
+  --cri-socket=${CRI_SOCKET}
 
-mkdir -p $HOME/.kube
-cp /etc/kubernetes/admin.conf $HOME/.kube/config
-chown $(id -u):$(id -g) $HOME/.kube/config
+echo "[INFO] Configuring kubectl for kubeadmin..."
 
-kubectl apply -f manifests/flannel.yaml
-kubectl apply -f manifests/ingress-nginx.yaml
+mkdir -p /home/kubeadmin/.kube
+cp /etc/kubernetes/admin.conf /home/kubeadmin/.kube/config
+chown kubeadmin:kubeadmin /home/kubeadmin/.kube/config
 
-kubeadm token create --print-join-command > /tmp/join.sh
+echo "[INFO] Installing Flannel CNI..."
+
+sudo -u kubeadmin kubectl apply -f \
+  https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
+
+echo "[INFO] Generating worker join command..."
+
+kubeadm token create --print-join-command > /tmp/kubeadm_join.sh
+chmod +x /tmp/kubeadm_join.sh
+
+echo "[SUCCESS] Master initialization complete."

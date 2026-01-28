@@ -1,0 +1,15 @@
+# Shell scripts must use Unix line endings
+*.sh text eol=lf
+
+# GitHub Actions & YAML configs
+*.yml  text eol=lf
+*.yaml text eol=lf
+
+# Environment / inventory files
+*.env  text eol=lf
+
+# Markdown
+*.md   text eol=lf
+
+# Default behavior for everything else
+* text=auto
