@@ -75,4 +75,4 @@ jobs:
                 -o UserKnownHostsFile=/dev/null \
                 "$SSH_USER@$node" \
                 "sudo -E MASTER_IP=$MASTER_IP bash -s" < scripts/worker.sh
-        done
+          done
