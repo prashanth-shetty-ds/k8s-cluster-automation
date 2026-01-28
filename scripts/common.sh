@@ -34,7 +34,7 @@ systemctl enable containerd
 mkdir -p /etc/apt/keyrings
 
 curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key \
-  | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  | gpg --dearmor --yes -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /" \
   > /etc/apt/sources.list.d/kubernetes.list
