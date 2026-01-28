@@ -53,12 +53,25 @@ jobs:
         if: ${{ github.event.inputs.action == 'bootstrap-cluster' }}
         shell: bash
         run: |
+          echo "=== ENTERING MASTER BOOTSTRAP STEP ==="
           ssh -tt \
-              -o BatchMode=yes \
-              -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              $SSH_USER@$MASTER_IP \
-              'sudo -n -i bash -s' < scripts/master.sh
+          -o BatchMode=yes \
+          -o StrictHostKeyChecking=no \
+          -o UserKnownHostsFile=/dev/null \
+          $SSH_USER@$MASTER_IP \
+          'echo "[REMOTE] Connected to master"; sudo -n -i bash -s' < scripts/master.sh
+          echo "=== EXITED MASTER BOOTSTRAP STEP ==="
+
+      - name: Validate kubeadm init
+        if: ${{ github.event.inputs.action == 'bootstrap-cluster' }}
+        run: |
+          ssh -tt \
+          -o BatchMode=yes \
+          -o StrictHostKeyChecking=no \
+          -o UserKnownHostsFile=/dev/null \
+          $SSH_USER@$MASTER_IP \
+          'test -f /etc/kubernetes/admin.conf'
+           echo "[SUCCESS] kubeadm init confirmed"
  
       - name: Validate Kubernetes Control Plane
         if: ${{ github.event.inputs.action == 'bootstrap-cluster' }}
