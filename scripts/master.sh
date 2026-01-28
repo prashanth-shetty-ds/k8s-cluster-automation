@@ -22,7 +22,7 @@ sudo -u kubeadmin kubectl apply -f \
 https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
 
 # Generate join command for workers
-kubeadm token create --print-join-command > /tmp/kubeadm_join.sh
-chmod +x /tmp/kubeadm_join.sh
+kkubeadm token create --print-join-command > /etc/kubernetes/join-command.sh
+chmod 600 /etc/kubernetes/join-command.sh
 
 echo "[SUCCESS] Master initialized"
