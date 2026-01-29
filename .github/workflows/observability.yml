@@ -38,5 +38,5 @@ jobs:
           --request-timeout=60s \
           -f /home/kubeadmin/manifests/monitoring
           echo "[INFO] Observability deployment completed"
-        EOF
+          EOF
 
