@@ -8,69 +8,29 @@ jobs:
     runs-on: [self-hosted, linux]
 
     steps:
-      # --------------------------------------------
-      # Checkout repo
-      # --------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # --------------------------------------------
-      # Load inventory (MASTER_IP, SSH_USER)
-      # --------------------------------------------
       - name: Load inventory
         shell: bash
         run: |
           set -a
           source inventory/hosts.env
           set +a
-
           echo "MASTER_IP=$MASTER_IP" >> $GITHUB_ENV
-          echo "SSH_USER=$SSH_USER" >> $GITHUB_ENV
 
-      # --------------------------------------------
-      # Fetch kubeconfig from master (ALWAYS)
-      # --------------------------------------------
-      - name: Fetch kubeconfig from master
+      - name: Copy manifests to bastion home
         shell: bash
         run: |
-          set -euxo pipefail
+          rsync -av manifests/ /home/kubeadmin/manifests/
 
-          ssh -o BatchMode=yes \
-              -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              "$SSH_USER@$MASTER_IP" \
-              'sudo cat /etc/kubernetes/admin.conf' \
-              > kubeconfig.yaml
-
-          chmod 600 kubeconfig.yaml
-
-      # --------------------------------------------
-      # Fix kubeconfig API server endpoint
-      # --------------------------------------------
-      - name: Fix kubeconfig server endpoint
+      - name: Deploy Observability from bastion shell
         shell: bash
         run: |
+          ssh kubeadmin@localhost <<'EOF'
           set -euxo pipefail
-          sed -i "s|server: https://127.0.0.1:6443|server: https://$MASTER_IP:6443|" kubeconfig.yaml
-
-      # --------------------------------------------
-      # Validate kubeconfig connectivity
-      # --------------------------------------------
-      - name: Validate kubeconfig
-        shell: bash
-        run: |
-          set -euxo pipefail
-          export KUBECONFIG=$PWD/kubeconfig.yaml
-          kubectl cluster-info
-
-      # --------------------------------------------
-      # Deploy Observability Stack
-      # --------------------------------------------
-      - name: Deploy Observability Stack
-        shell: bash
-        run: |
-          set -euxo pipefail
-          export KUBECONFIG=$PWD/kubeconfig.yaml
+          export KUBECONFIG=/home/kubeadmin/kubeconfig.yaml
 
           kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
-          kubectl apply -f manifests/monitoring
+          kubectl apply -f /home/kubeadmin/manifests/monitoring
+          EOF
