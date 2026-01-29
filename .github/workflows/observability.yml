@@ -11,16 +11,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Fix kubeconfig server endpoint
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sed -i "s|server: https://127.0.0.1:6443|server: https://$MASTER_IP:6443|" kubeconfig.yaml
+
+      - name: Validate kubeconfig
+        shell: bash
+        run: |
+          set -euxo pipefail
+          export KUBECONFIG=$PWD/kubeconfig.yaml
+          kubectl cluster-info
+
       - name: Deploy Observability Stack
         shell: bash
         run: |
           set -euxo pipefail
-
-          # Use kubeconfig fetched during cluster bootstrap
           export KUBECONFIG=$PWD/kubeconfig.yaml
 
-          # Create namespace if it doesn't exist
           kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
-
-          # Apply monitoring manifests
           kubectl apply -f manifests/monitoring
