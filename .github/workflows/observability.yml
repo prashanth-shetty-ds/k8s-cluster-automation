@@ -8,15 +8,36 @@ jobs:
     runs-on: [self-hosted, linux]
 
     steps:
+      # ---------------------------------------------------
+      # Checkout repository
+      # ---------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ---------------------------------------------------
+      # Load inventory (MASTER_IP required)
+      # ---------------------------------------------------
+      - name: Load inventory
+        shell: bash
+        run: |
+          set -a
+          source inventory/hosts.env
+          set +a
+
+          echo "MASTER_IP=$MASTER_IP" >> $GITHUB_ENV
+
+      # ---------------------------------------------------
+      # Updating kubeconfig API server endpoint
+      # ---------------------------------------------------
       - name: Fix kubeconfig server endpoint
         shell: bash
         run: |
           set -euxo pipefail
           sed -i "s|server: https://127.0.0.1:6443|server: https://$MASTER_IP:6443|" kubeconfig.yaml
 
+      # ---------------------------------------------------
+      # Validate kubeconfig connectivity
+      # ---------------------------------------------------
       - name: Validate kubeconfig
         shell: bash
         run: |
@@ -24,6 +45,9 @@ jobs:
           export KUBECONFIG=$PWD/kubeconfig.yaml
           kubectl cluster-info
 
+      # ---------------------------------------------------
+      # Deploy Observability stack
+      # ---------------------------------------------------
       - name: Deploy Observability Stack
         shell: bash
         run: |
