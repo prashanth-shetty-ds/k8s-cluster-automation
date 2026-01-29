@@ -5,14 +5,22 @@ on:
 
 jobs:
   monitoring:
-    runs-on: self-hosted
+    runs-on: [self-hosted, linux]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Deploy Prometheus Stack
+      - name: Deploy Observability Stack
+        shell: bash
         run: |
-          ssh kubeadmin@192.168.29.150 <<EOF
-          kubectl create namespace monitoring || true
-          kubectl apply -f manifests/monitoring/
-          EOF
+          set -euxo pipefail
+
+          # Use kubeconfig fetched during cluster bootstrap
+          export KUBECONFIG=$PWD/kubeconfig.yaml
+
+          # Create namespace if it doesn't exist
+          kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+
+          # Apply monitoring manifests
+          kubectl apply -f manifests/monitoring
