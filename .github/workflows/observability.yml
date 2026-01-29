@@ -27,10 +27,19 @@ jobs:
       - name: Deploy Observability from bastion shell
         shell: bash
         run: |
-          ssh kubeadmin@localhost <<'EOF'
+          ssh -tt kubeadmin@localhost <<'EOF'
           set -euxo pipefail
           export KUBECONFIG=/home/kubeadmin/kubeconfig.yaml
 
-          kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
-          kubectl apply -f /home/kubeadmin/manifests/monitoring
+          echo "[INFO] Creating monitoring namespace"
+          kubectl create namespace monitoring \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          echo "[INFO] Applying monitoring manifests"
+          kubectl apply \
+            --request-timeout=60s \
+            -f /home/kubeadmin/manifests/monitoring
+
+          echo "[INFO] Observability deployment completed"
           EOF
+
