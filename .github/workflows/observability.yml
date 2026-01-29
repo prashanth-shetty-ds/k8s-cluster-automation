@@ -8,28 +8,54 @@ jobs:
     runs-on: [self-hosted, linux]
 
     steps:
+      # --------------------------------------------
+      # Checkout repo
+      # --------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # --------------------------------------------
+      # Load inventory (MASTER_IP, SSH_USER)
+      # --------------------------------------------
       - name: Load inventory
         shell: bash
         run: |
           set -a
           source inventory/hosts.env
           set +a
+
           echo "MASTER_IP=$MASTER_IP" >> $GITHUB_ENV
+          echo "SSH_USER=$SSH_USER" >> $GITHUB_ENV
 
-      - name: Download kubeconfig artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: kubeconfig
+      # --------------------------------------------
+      # Fetch kubeconfig from master (ALWAYS)
+      # --------------------------------------------
+      - name: Fetch kubeconfig from master
+        shell: bash
+        run: |
+          set -euxo pipefail
 
+          ssh -o BatchMode=yes \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              "$SSH_USER@$MASTER_IP" \
+              'sudo cat /etc/kubernetes/admin.conf' \
+              > kubeconfig.yaml
+
+          chmod 600 kubeconfig.yaml
+
+      # --------------------------------------------
+      # Fix kubeconfig API server endpoint
+      # --------------------------------------------
       - name: Fix kubeconfig server endpoint
         shell: bash
         run: |
           set -euxo pipefail
           sed -i "s|server: https://127.0.0.1:6443|server: https://$MASTER_IP:6443|" kubeconfig.yaml
 
+      # --------------------------------------------
+      # Validate kubeconfig connectivity
+      # --------------------------------------------
       - name: Validate kubeconfig
         shell: bash
         run: |
@@ -37,6 +63,9 @@ jobs:
           export KUBECONFIG=$PWD/kubeconfig.yaml
           kubectl cluster-info
 
+      # --------------------------------------------
+      # Deploy Observability Stack
+      # --------------------------------------------
       - name: Deploy Observability Stack
         shell: bash
         run: |
