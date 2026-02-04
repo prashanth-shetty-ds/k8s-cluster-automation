@@ -11,23 +11,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Copy monitoring manifests
-        shell: bash
-        run: |
-          rsync -av manifests/ /home/kubeadmin/manifests/
-
       - name: Deploy Observability Stack
         shell: bash
         run: |
           set -euxo pipefail
 
-          export KUBECONFIG=/home/kubeadmin/kubeconfig.yaml
+          KCFG=/home/kubeadmin/kubeconfig.yaml
 
-          kubectl create namespace monitoring \
-            --dry-run=client -o yaml | kubectl apply -f -
+          echo "[INFO] Creating monitoring namespace"
+          kubectl --kubeconfig=$KCFG create namespace monitoring \
+            --dry-run=client -o yaml | kubectl --kubeconfig=$KCFG apply -f -
 
-          kubectl apply \
+          echo "[INFO] Applying manifests from repo"
+          ls -l manifests/monitoring
+
+          kubectl --kubeconfig=$KCFG apply \
             --request-timeout=60s \
-            -f /home/kubeadmin/manifests/monitoring
+            -f manifests/monitoring
 
           echo "[INFO] Observability deployment completed"
