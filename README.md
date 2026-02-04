@@ -1,4 +1,4 @@
-# 🚀 Kubernetes Cluster Automation on Oracle VirtualBox
+# Kubernetes Cluster Automation on Oracle VirtualBox
 
 ## Overview
 
@@ -10,7 +10,7 @@ All application deployments (monitoring, gateways, workloads, etc.) are handled 
 
 ---
 
-## 🎯 Goals
+## Goals
 
 - Automate Kubernetes cluster creation on VirtualBox VMs
 - Eliminate manual SSH and ad-hoc kubectl operations
@@ -20,7 +20,7 @@ All application deployments (monitoring, gateways, workloads, etc.) are handled 
 
 ---
 
-## 🧱 Architecture
+## Architecture
 
             ┌──────────────────────────────┐
             │     Oracle VirtualBox VMs    │
@@ -41,7 +41,7 @@ All application deployments (monitoring, gateways, workloads, etc.) are handled 
 
 ---
 
-## 📦 What This Repo Does
+## What does this repo do ??
 
 This repository automates:
 
@@ -59,7 +59,7 @@ Applications are managed by a separate repository:
 
 ---
 
-## 🖥️ Cluster Layout
+## Cluster Layout
 
 | Node      | IP              | Role          |
 |-----------|-----------------|---------------|
@@ -76,7 +76,7 @@ Each VM has:
 
 ---
 
-## 🛠 Prerequisites
+## Prerequisites
 
 ### Host Machine
 
@@ -95,7 +95,7 @@ Each VM has:
 
 ---
 
-## 📂 Repository Structure
+## Repository Structure
 
 ``` 
 k8s-cluster-automation/
@@ -119,7 +119,7 @@ k8s-cluster-automation/
 
 ---
 
-## ⚙️ Workflow Overview
+## Workflow Overview
 
 Cluster provisioning is triggered via GitHub Actions:
 
@@ -137,7 +137,7 @@ No manual SSH is required after initial VM setup.
 
 ---
 
-## 🚦 Kernel Networking Requirements
+## Kernel Networking Requirements
 
 Each node loads:
 
@@ -156,7 +156,7 @@ This is required for Flannel networking.
 
 ---
 
-## 🔐 Security Model
+## Security Model
 
 - No passwords in pipelines
 - SSH keys only
@@ -165,7 +165,7 @@ This is required for Flannel networking.
 
 ---
 
-## 🔄 GitOps Strategy
+## GitOps Strategy
 
 This repository provisions infrastructure only.
 
@@ -184,7 +184,7 @@ This provides:
 
 ---
 
-## 🧠 Design Principles
+## Design Principles
 
 - Infrastructure as Code
 - Immutable cluster bootstrap
@@ -195,7 +195,7 @@ This provides:
 
 ---
 
-## ✅ Validation
+## Validation
 
 After bootstrap:
 
@@ -221,7 +221,7 @@ ArgoCD running
 - Backup automation
 - Multi-cluster support
 
-## 📖 Learning Outcomes
+## Learning Outcomes
 
 This project demonstrates:
 
