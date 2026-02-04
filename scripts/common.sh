@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euxo pipefail
+
 export DEBIAN_FRONTEND=noninteractive
 
 echo "[INFO] Running common prerequisites"
@@ -19,9 +20,9 @@ modprobe overlay
 modprobe br_netfilter
 
 cat <<EOF >/etc/sysctl.d/k8s.conf
-net.bridge.bridge-nf-call-iptables=1
-net.bridge.bridge-nf-call-ip6tables=1
-net.ipv4.ip_forward=1
+net.bridge.bridge-nf-call-iptables = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward = 1
 EOF
 
 sysctl --system
@@ -31,6 +32,12 @@ apt-get install -y containerd curl gpg apt-transport-https
 
 mkdir -p /etc/containerd
 containerd config default > /etc/containerd/config.toml
+
+cat <<EOF >/etc/crictl.yaml
+runtime-endpoint: unix:///run/containerd/containerd.sock
+image-endpoint: unix:///run/containerd/containerd.sock
+EOF
+
 systemctl restart containerd
 systemctl enable containerd
 
